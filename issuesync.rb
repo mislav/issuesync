@@ -5,6 +5,13 @@ require 'pathname'
 require 'fileutils'
 
 # Downloads GitHub issues & pull requests for this repo to the "issues" directory.
+#
+# An issue with comments is stored in Markdown format in a file named "{number}.md".
+# A patch file for open pull requests is downloaded to "{number}.patch".
+#
+# The rate limit of GitHub's API might not be enough to download all issues for
+# a popular project. If such an exception occurs, wait an hour, then start the
+# sync again; it will continue where it left off.
 class IssueSync
   def self.start(*args)
     new(*args).start
