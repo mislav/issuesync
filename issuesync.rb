@@ -21,7 +21,7 @@ class IssueSync
   def start
     issue_fetcher = IssueFetcher.new(api_client, Issue)
     comment_fetcher = CommentFetcher.new(api_client, Comment)
-    issues = issue_fetcher.all_issues(repo)
+    issues = issue_fetcher.call(repo)
 
     FileUtils.mkdir_p path
 
@@ -68,7 +68,7 @@ class IssueSync
       raw_issues(repo, state).map {|entry| data_class.new entry }
     end
 
-    def all_issues(repo)
+    def call(repo)
       issues(repo, 'open') + issues(repo, 'closed')
     end
   end
