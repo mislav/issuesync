@@ -4,6 +4,7 @@ require 'json'
 require 'pathname'
 require 'fileutils'
 
+# Downloads GitHub issues & pull requests for this repo to the "issues" directory.
 class IssueSync
   def self.start(*args)
     new(*args).start
