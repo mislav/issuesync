@@ -9,24 +9,25 @@ class IssueSync
     new(*args).start
   end
 
-  attr_reader :repo, :path
+  attr_reader :repo, :path, :api_client
 
   def initialize repo, path
     @repo = repo
     @path = Pathname.new(path).expand_path
+    @api_client = ApiClient.new
   end
 
   def start
-    # since: time.utc.iso8601
-    data = get "/repos/#{repo}/issues?state=open&sort=updated"
-    data += get "/repos/#{repo}/issues?state=closed&sort=updated"
-    issues = data.map {|entry| Issue.new entry }
+    issue_fetcher = IssueFetcher.new(api_client, Issue)
+    comment_fetcher = CommentFetcher.new(api_client, Comment)
+    issues = issue_fetcher.all_issues(repo)
 
     FileUtils.mkdir_p path
 
     for issue in issues
       issue_file = path + "#{issue.number}.md"
-      next if issue_file.exist? and issue_file.mtime >= issue.updated_at
+      patch_file = path + "#{issue.number}.patch"
+
       issue_file.open 'w' do |file|
         title = "##{issue.number}: #{issue.title}"
         file.puts title
@@ -34,86 +35,116 @@ class IssueSync
         file.puts
         file.puts issue.body
 
-        if issue.has_comments?
-          data = get issue.comments_url
-          comments = data.map {|entry| Comment.new entry }
-
-          for comment in comments
-            file.puts
-            file.puts "## #{comment.user}"
-            file.puts
-            file.puts comment.body
-          end
+        comments = comment_fetcher.call(issue)
+        for comment in comments
+          file.puts
+          file.puts "## #{comment.user}"
+          file.puts
+          file.puts comment.body
         end
-      end
+      end if stale?(issue_file, issue)
 
-      if patch_url = issue.patch_url
-        patch = get_response patch_url
-        patch_file = Pathname.new issue_file.to_s.sub(/\.md$/, '.patch')
+      if patch_url = issue.patch_url and issue.open? and stale?(patch_file, issue)
+        patch = api_client.get_response patch_url
         patch_file.open('w') {|f| f << patch.body }
       end
     end
   end
 
-  def base_uri() URI 'https://api.github.com' end
+  def stale? file, issue
+    !file.exist? or file.mtime < issue.updated_at
+  end
 
-  def http
-    @http ||= begin
-      conn = Net::HTTP::Persistent.new self.class.name
-      conn.debug_output = $stderr if $DEBUG
-      conn
+  IssueFetcher = Struct.new(:api_client, :data_class) do
+    def raw_issues(repo, state)
+      # since: time.utc.iso8601
+      api_client.get "/repos/#{repo}/issues?state=#{state}&sort=updated"
+    end
+
+    def issues(repo, state)
+      raw_issues(repo, state).map {|entry| data_class.new entry }
+    end
+
+    def all_issues(repo)
+      issues(repo, 'open') + issues(repo, 'closed')
     end
   end
 
-  def headers
-    { 'Accept' => 'application/vnd.github.v3.raw+json',
-    }
+  CommentFetcher = Struct.new(:api_client, :data_class) do
+    def raw_comments issue
+      api_client.get issue.comments_url
+    end
+
+    def call issue
+      if issue.has_comments?
+        raw_comments(issue).map {|entry| data_class.new entry }
+      else
+        []
+      end
+    end
   end
 
-  def get path
-    data = nil
-    uri  = base_uri + path
+  class ApiClient
+    def base_uri() URI 'https://api.github.com' end
 
-    while uri
-      res  = get_response uri
-      data = data ? data.concat(res.data) : res.data
-      uri  = res.next_url
+    def http
+      @http ||= begin
+        conn = Net::HTTP::Persistent.new self.class.name
+        conn.debug_output = $stderr if $DEBUG
+        conn
+      end
     end
 
-    data
-  end
-
-  def get_response uri
-    req = Net::HTTP::Get.new uri.request_uri, headers
-    $stderr.puts uri if $VERBOSE
-    res = ApiResponse.new http.request(uri, req)
-    res.response.error! unless res.success?
-    $stderr.puts "ratelimit remaining: %d" % res.ratelimit_remaining if $VERBOSE
-    res
-  end
-
-  ApiResponse = Struct.new(:response) do
-    def body() response.body end
-
-    def success?() Net::HTTPSuccess === response end
-
-    def data
-      @data ||= JSON.parse body
+    def headers
+      { 'Accept' => 'application/vnd.github.v3.raw+json',
+      }
     end
 
-    def links
-      response['link'].to_s.
-        scan(/<(.+?)>; rel="(.+?)"/).
-        each_with_object({}) {|(url, type), all| all[type] = url }
+    def get path
+      data = nil
+      uri  = base_uri + path
+
+      while uri
+        res  = get_response uri
+        data = data ? data.concat(res.data) : res.data
+        uri  = res.next_url
+      end
+
+      data
     end
 
-    def ratelimit_remaining
-      response['x-ratelimit-remaining'].to_i
+    def get_response uri
+      req = Net::HTTP::Get.new uri.request_uri, headers
+      $stderr.puts uri if $VERBOSE
+      res = ApiResponse.new http.request(uri, req)
+      res.response.error! unless res.success?
+      $stderr.puts "ratelimit remaining: %d" % res.ratelimit_remaining if $VERBOSE
+      res
     end
 
-    def next_url
-      if rel_next = links['next']
-        URI rel_next
+    ApiResponse = Struct.new(:response) do
+      def body() response.body end
+
+      def success?() Net::HTTPSuccess === response end
+
+      def data
+        @data ||= JSON.parse body
+      end
+
+      def links
+        response['link'].to_s.
+          scan(/<(.+?)>; rel="(.+?)"/).
+          each_with_object({}) {|(url, type), all| all[type] = url }
+      end
+
+      def ratelimit_remaining
+        response['x-ratelimit-remaining'].to_i
+      end
+
+      def next_url
+        if rel_next = links['next']
+          URI rel_next
+        end
       end
     end
   end
@@ -129,6 +160,8 @@ class IssueSync
     end
     def updated_at() Time.parse(data['updated_at']) end
     def has_comments?() !data['comments'].zero? end
+    def open?() data['state'] == 'open' end
+    def closed?() !open? end
   end
 
   class Comment < Issue
