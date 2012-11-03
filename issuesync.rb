@@ -59,6 +59,10 @@ class IssueSync
         patch_file.open('w') {|f| f << patch.body }
       end
     end
+  rescue Net::HTTPExceptions => error
+    warn "Aborted: GitHub API returned #{error.message}"
+    warn error.response.body
+    exit 1
   end
 
   def stale? file, issue
