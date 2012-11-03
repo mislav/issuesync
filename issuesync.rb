@@ -30,6 +30,8 @@ class IssueSync
 
       issue_file.open 'w' do |file|
         title = "##{issue.number}: #{issue.title}"
+        title << "  [CLOSED]" if issue.closed?
+
         file.puts title
         file.puts "=" * title.size
         file.puts
