@@ -28,9 +28,11 @@ class IssueSync
   def start
     issue_fetcher = IssueFetcher.new(api_client, Issue)
     comment_fetcher = CommentFetcher.new(api_client, Comment)
-    issues = issue_fetcher.call(repo)
 
     FileUtils.mkdir_p path
+    last_updated = Dir.entries(path).grep(/\.md$/).map {|name| (path+name).mtime }.max
+
+    issues = issue_fetcher.call(repo, last_updated)
 
     for issue in issues
       issue_file = path + "#{issue.number}.md"
@@ -70,17 +72,18 @@ class IssueSync
   end
 
   IssueFetcher = Struct.new(:api_client, :data_class) do
-    def raw_issues(repo, state)
-      # since: time.utc.iso8601
-      api_client.get "/repos/#{repo}/issues?state=#{state}&sort=updated"
+    def raw_issues(repo, state, since)
+      path = "/repos/#{repo}/issues?state=#{state}&sort=updated"
+      path << "&since=#{since.utc.iso8601}" if since.respond_to? :utc
+      api_client.get path
     end
 
-    def issues(repo, state)
-      raw_issues(repo, state).map {|entry| data_class.new entry }
+    def issues(repo, state, since)
+      raw_issues(repo, states, since).map {|entry| data_class.new entry }
     end
 
-    def call(repo)
-      issues(repo, 'open') + issues(repo, 'closed')
+    def call(repo, since = nil)
+      issues(repo, 'open', since) + issues(repo, 'closed', since)
     end
   end
 
