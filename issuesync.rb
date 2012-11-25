@@ -28,6 +28,7 @@ class IssueSync
   def start
     issue_fetcher = IssueFetcher.new(api_client, Issue)
     comment_fetcher = CommentFetcher.new(api_client, Comment)
+    formatter = IssueFormatter.new
 
     FileUtils.mkdir_p path
     last_updated = Dir.entries(path).grep(/\.md$/).map {|name| (path+name).mtime }.max
@@ -39,21 +40,7 @@ class IssueSync
       patch_file = path + "#{issue.number}.patch"
 
       issue_file.open 'w' do |file|
-        title = "##{issue.number}: #{issue.title}"
-        title << "  [CLOSED]" if issue.closed?
-
-        file.puts title
-        file.puts "=" * title.size
-        file.puts
-        file.puts issue.body
-
-        comments = comment_fetcher.call(issue)
-        for comment in comments
-          file.puts
-          file.puts "## #{comment.user}"
-          file.puts
-          file.puts comment.body
-        end
+        formatter.format(file, issue, comment_fetcher.call(issue))
       end if stale?(issue_file, issue)
 
       if patch_url = issue.patch_url and issue.open? and stale?(patch_file, issue)
@@ -69,6 +56,30 @@ class IssueSync
 
   def stale? file, issue
     !file.exist? or file.mtime < issue.updated_at
+  end
+
+  class IssueFormatter
+    def format(io, issue, comments)
+      format_body(io, issue)
+      format_comment(io, comment) for comment in comments
+    end
+
+    def format_body(io, issue)
+      title = "##{issue.number}: #{issue.title}"
+      title << "  [CLOSED]" if issue.closed?
+
+      io.puts title
+      io.puts "=" * title.size
+      io.puts
+      io.puts issue.body
+    end
+
+    def format_comment(io, comment)
+      io.puts
+      io.puts "## #{comment.user}"
+      io.puts
+      io.puts comment.body
+    end
   end
 
   IssueFetcher = Struct.new(:api_client, :data_class) do
