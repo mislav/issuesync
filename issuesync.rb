@@ -1,8 +1,12 @@
-require 'net/http/persistent'
-require 'time'
-require 'json'
-require 'pathname'
-require 'fileutils'
+begin
+  require 'net/http/persistent'
+  require 'time'
+  require 'json'
+  require 'pathname'
+  require 'fileutils'
+rescue LoadError
+  abort $!.to_s
+end
 
 # Downloads GitHub issues & pull requests for the current project to the "issues"
 # directory. If downloaded issues already exist, it only fetches new issues/comments.
