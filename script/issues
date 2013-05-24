@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Displays last 10 issues from the current project's `issues/' directory.
+
+ls issues | grep .md | sort -rn | head "$@" | xargs -I% head -1 issues/%

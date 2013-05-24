@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Generates ctags for the current project to `.git/tags' and adds to it tags
+# for issues as well. For instance, tag `123' will point to `issues/123.md'.
+set -e
+
+if [ "$1" = "-f" ]; then
+  tagfile="$2"
+  shift 2
+else
+  tagfile=.git/tags
+fi
+
+ctags --tag-relative -Rf "$tagfile" --exclude=.git --languages=-javascript
+
+{ for file in issues/*.md; do
+    num=$(basename "$file" .md)
+    delim=$'\t'
+    echo "${num}${delim}../${file}${delim}/^#${num}/"
+  done
+} >> "$tagfile"
