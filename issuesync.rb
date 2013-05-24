@@ -4,10 +4,18 @@ require 'json'
 require 'pathname'
 require 'fileutils'
 
-# Downloads GitHub issues & pull requests for this repo to the "issues" directory.
+# Downloads GitHub issues & pull requests for the current project to the "issues"
+# directory. If downloaded issues already exist, it only fetches new issues/comments.
 #
 # An issue with comments is stored in Markdown format in a file named "{number}.md".
 # A patch file for open pull requests is downloaded to "{number}.patch".
+#
+# Depends on:
+# - net-http-persistent
+# - Ruby 1.9
+#
+# Enable ruby's verbose mode (`RUBYOPT=-w`) to display fetched URLs on stderr.
+# Enable debug mode (`RUBYOPT=-d`) to dump in-depth info about each HTTP request.
 #
 # The rate limit of GitHub's API might not be enough to download all issues for
 # a popular project. If such an exception occurs, wait an hour, then start the
@@ -39,7 +47,7 @@ class IssueSync
       issue_file = path + "#{issue.number}.md"
       patch_file = path + "#{issue.number}.patch"
 
-      issue_file.open 'w' do |file|
+      issue_file.open('w') do |file|
         formatter.format(file, issue, comment_fetcher.call(issue))
       end if stale?(issue_file, issue)
 
@@ -209,5 +217,5 @@ if __FILE__ == $0
   repo_with_owner = "#$1/#$2" if $1
   abort "no GitHub repo found among git remotes" if repo_with_owner.nil?
 
-  IssueSync.start repo_with_owner, 'issues'
+  IssueSync.start(repo_with_owner, 'issues')
 end
