@@ -61,7 +61,9 @@ class IssueSync
   class IssueFormatter
     def format(io, issue, comments)
       format_body(io, issue)
-      format_comment(io, comment) for comment in comments
+      for comment in comments
+        format_comment(io, comment)
+      end
     end
 
     def format_body(io, issue)
@@ -90,7 +92,7 @@ class IssueSync
     end
 
     def issues(repo, state, since)
-      raw_issues(repo, states, since).map {|entry| data_class.new entry }
+      raw_issues(repo, state, since).map {|entry| data_class.new entry }
     end
 
     def call(repo, since = nil)
@@ -184,7 +186,8 @@ class IssueSync
     def user() data['user']['login'] end
     def comments_url() URI(data['url'] + '/') + 'comments' end
     def patch_url
-      url = data['pull_request']['patch_url'] and URI(url)
+      pr = data['pull_request']
+      url = pr && pr['patch_url'] and URI(url)
     end
     def updated_at() Time.parse(data['updated_at']) end
     def has_comments?() !data['comments'].zero? end
