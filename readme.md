@@ -4,6 +4,7 @@ A simple Ruby script that downloads all issues for the current GitHub project
 to Markdown files for offline perusal.
 
 ```
+$ gem install net-http-persistent
 $ rake install [PREFIX=/usr/local]
 
 $ cd /path/to/myproject
