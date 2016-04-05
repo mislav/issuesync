@@ -79,7 +79,7 @@ class IssueSync
     end
 
     def format_body(io, issue)
-      title = "##{issue.number}: #{issue.title}"
+      title = "##{issue.number}: #{issue.title.strip}"
       title << "  [CLOSED]" if issue.closed?
 
       io.puts title
