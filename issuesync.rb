@@ -164,7 +164,7 @@ class IssueSync
 
     def get_response uri
       req = Net::HTTP::Get.new uri.request_uri, headers(uri.host)
-      $stderr.puts uri if $VERBOSE
+      $stderr.puts "GET #{uri}" if $VERBOSE
       res = ApiResponse.new http.request(uri, req)
 
       if res.redirect?
