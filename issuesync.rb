@@ -129,6 +129,8 @@ class IssueSync
   class ApiClient
     def base_uri() URI 'https://api.github.com' end
 
+    def auth_token() ENV['GITHUB_TOKEN'] end
+
     def http
       @http ||= begin
         conn = Net::HTTP::Persistent.new self.class.name
@@ -138,8 +140,13 @@ class IssueSync
     end
 
     def headers
-      { 'Accept' => 'application/vnd.github.v3.raw+json',
+      all = {
+        'Accept' => 'application/vnd.github.v3.raw+json',
       }
+      unless auth_token.to_s.empty?
+        all['Authorization'] = "token #{auth_token}"
+      end
+      all
     end
 
     def get path
