@@ -172,7 +172,9 @@ class IssueSync
       elsif !res.success?
         res.response.error!
       else
-        $stderr.puts "ratelimit remaining: %d" % res.ratelimit_remaining if $VERBOSE
+        if $VERBOSE && uri.host == base_uri.host
+          $stderr.puts "ratelimit remaining: %d" % res.ratelimit_remaining
+        end
         res
       end
     end
