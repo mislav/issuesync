@@ -139,11 +139,11 @@ class IssueSync
       end
     end
 
-    def headers
+    def headers(host)
       all = {
         'Accept' => 'application/vnd.github.v3.raw+json',
       }
-      unless auth_token.to_s.empty?
+      if host == base_uri.host && !auth_token.to_s.empty?
         all['Authorization'] = "token #{auth_token}"
       end
       all
@@ -163,18 +163,30 @@ class IssueSync
     end
 
     def get_response uri
-      req = Net::HTTP::Get.new uri.request_uri, headers
+      req = Net::HTTP::Get.new uri.request_uri, headers(uri.host)
       $stderr.puts uri if $VERBOSE
       res = ApiResponse.new http.request(uri, req)
-      res.response.error! unless res.success?
-      $stderr.puts "ratelimit remaining: %d" % res.ratelimit_remaining if $VERBOSE
-      res
+
+      if res.redirect?
+        get_response uri + res.redirect_location
+      elsif !res.success?
+        res.response.error!
+      else
+        $stderr.puts "ratelimit remaining: %d" % res.ratelimit_remaining if $VERBOSE
+        res
+      end
     end
 
     ApiResponse = Struct.new(:response) do
       def body() response.body end
 
       def success?() Net::HTTPSuccess === response end
+
+      def redirect?() Net::HTTPRedirection === response end
+
+      def redirect_location
+        response['location']
+      end
 
       def data
         @data ||= JSON.parse body
