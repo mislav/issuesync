@@ -85,6 +85,8 @@ class IssueSync
       io.puts title
       io.puts "=" * title.size
       io.puts
+      io.puts "## #{issue.user}"
+      io.puts
       io.puts issue.body
     end
 
