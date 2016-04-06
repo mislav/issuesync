@@ -4,6 +4,7 @@ begin
   require 'json'
   require 'pathname'
   require 'fileutils'
+  require 'cgi'
 rescue LoadError
   abort $!.to_s
 end
@@ -134,9 +135,29 @@ class IssueSync
 
     def auth_token() ENV['GITHUB_TOKEN'] end
 
+    def proxy_uri
+      no_proxy = get_env('no_proxy')
+      return if no_proxy == '*'
+
+      if proxy = get_env('https_proxy') || get_env('all_proxy')
+        proxy = "http://#{proxy}" unless proxy =~ /^https?:/
+        proxy += "?no_proxy=#{CGI.escape no_proxy}" if no_proxy
+        URI proxy
+      end
+    end
+
+    def get_env key
+      val = ENV[key]
+      if val && !val.empty?
+        val
+      elsif key !~ /[A-Z]/
+        get_env key.upcase
+      end
+    end
+
     def http
       @http ||= begin
-        conn = Net::HTTP::Persistent.new self.class.name
+        conn = Net::HTTP::Persistent.new self.class.name, proxy_uri
         conn.debug_output = $stderr if $DEBUG
         conn
       end
