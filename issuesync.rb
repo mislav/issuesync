@@ -80,9 +80,11 @@ class IssueSync
     end
 
     def format_body(io, issue)
-      title = "##{issue.number}: #{issue.title.strip}"
-      title << issue.labels
-      title << "  [CLOSED]" if issue.closed?
+      title = "##{issue.number}: #{issue.title.strip} "
+      for label in issue.labels
+        title << " [" + label + "]"
+      end
+      title << " [CLOSED]" if issue.closed?
 
       io.puts title
       io.puts "=" * title.size
@@ -250,14 +252,7 @@ class IssueSync
     def has_comments?() !data['comments'].zero? end
     def open?() data['state'] == 'open' end
     def closed?() !open? end
-
-    def labels()
-      s = ""
-      for label in data['labels']
-        s << "  _" + label['name'] + "_"
-      end
-      s
-    end
+    def labels() data['labels'].map {|x| x['name']} end
   end
 
   class Comment < Issue
