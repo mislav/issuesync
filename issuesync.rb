@@ -85,6 +85,7 @@ class IssueSync
         title << " [#{label}]"
       end
       title << " [CLOSED]" if issue.closed?
+      title = title.strip
 
       io.puts title
       io.puts "=" * title.size
