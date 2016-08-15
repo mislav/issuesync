@@ -266,7 +266,9 @@ class IssueSync
 end
 
 if __FILE__ == $0
-  File.readlines('.git/config').find {|rem| %r{github\.com[:/](.+?)/(.+?)(\.git)?$} =~ rem }
+  remotes = `git remote`.lines
+  remote_urls = remotes.map {|remote| `git remote get-url #{remote}` }
+  remote_urls.find {|rem| %r{github\.com[:/](.+?)/(.+?)(\.git)?$} =~ rem }
   repo_with_owner = "#$1/#$2" if $1
   abort "no GitHub repo found among git remotes" if repo_with_owner.nil?
 
