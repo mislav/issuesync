@@ -160,7 +160,7 @@ class IssueSync
 
     def http
       @http ||= begin
-        conn = Net::HTTP::Persistent.new self.class.name, proxy_uri
+        conn = Net::HTTP::Persistent.new name: self.class.name, proxy: proxy_uri
         conn.debug_output = $stderr if $DEBUG
         conn
       end
