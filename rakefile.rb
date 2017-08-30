@@ -26,7 +26,7 @@ task :install do
     abort "aborted: `#{exefile}' already exists"
   end
 
-  File.open(exefile, 'w', 755) do |exe|
+  File.open(exefile, 'w', 0755) do |exe|
     exe.puts "#!/bin/sh"
     exe.puts "'#{ruby}' '#{here}/issuesync.rb'"
   end
