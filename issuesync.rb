@@ -160,7 +160,11 @@ class IssueSync
 
     def http
       @http ||= begin
-        conn = Net::HTTP::Persistent.new name: self.class.name, proxy: proxy_uri
+        conn = if Net::HTTP::Persistent::VERSION.to_i < 3
+          Net::HTTP::Persistent.new self.class.name, proxy_uri
+        else
+          Net::HTTP::Persistent.new name: self.class.name, proxy: proxy_uri
+        end
         conn.debug_output = $stderr if $DEBUG
         conn
       end
