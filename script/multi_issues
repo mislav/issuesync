@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# Pull issues from multiple github repositories, and
+# store them all in the same place(called archive), but
+# also place back a symlink inside the Git checkout, to
+# the actual issues directory.
+#
+# This script is also capable of fetching the number of issues
+# on github out of a collection of local Git repositories.
+#
+# Deps: GNU parallel
+#
+export GITHUB_TOKEN="658a1a3286e257f15d8714918734031ec701b89d"
+DIR=$(dirname `readlink -f $0`)
+ARCHIVE=$DIR/iss
+REPOS=()
+REPOS+=(archive/repo1 archive/repo2)
+
+multi_sync() {
+		mkdir $ARCHIVE >/dev/null 2>&1
+    for repo in "${REPOS[@]}"; do
+				echo "[INFO] getting issues for $repo"
+			  pushd .
+			  A=$ARCHIVE/$(basename $repo)
+			  mkdir $A >/dev/null 2>&1
+			  cd $repo
+			  ln -s $A issues >/dev/null 2>&1
+			  issuesync
+			  popd
+		done
+}
+
+usage() {
+echo "
+./issues [-s|-o|-c]
+
+-s       -- sync issues for multiple projects
+-o       -- list all open issues in archive
+-c       -- list all closed issues in the archive
+-n <DIR> -- fetch number of issues in all git repositories in a directory
+"
+}
+
+OPT=
+while getopts "socixn:" opt; do
+    case "${opt}" in
+        s)
+            multi_sync
+            OPT="sync"
+				;;
+        o)
+            grep -H -r "#[0-9]\+: " $ARCHIVE/ |  awk -F':' '!/CLOSED/ { print $1}'
+            OPT="open"
+				;;
+        c)
+            grep -H -r "#[0-9]\+: " $ARCHIVE/ |  awk -F':' ' /CLOSED/ { print $1}'
+            OPT="closed"
+        ;;
+        i)
+            grep -H -r "#[0-9]\+: " $ARCHIVE/ |  awk -F':' '!/CLOSED/ { print $1}' | \
+            xargs -I% /bin/bash -c 'echo $(basename %):%' | sort -n 
+            OPT="sorted_open"
+        ;;
+        n)
+            DIR=${OPTARG}
+            # go over all git local repositories
+            # make a request to their github homepage and extract number of
+            # issues, then print the git urls together with the issue counts
+            find $DIR -maxdepth 3 -name ".git" | sed -e 's/\.git//g' | \
+            parallel -k --no-notice 'cd {1}; x=$(git config --get remote.origin.url | sed -e "s/\.git//"); echo $x,{1}' | \
+            grep github | grep -v gist.github.com | \
+            parallel -C, -k --no-notice 'x=$(curl {1} 2>/dev/null | grep -A1 "<span itemprop=\"name\">Issues</span>" | tail -1 | perl -pne "s/[^0-9]+//g;"); echo "$x,{1},{2}"'
+            OPT="fetch_number_issues"
+        ;;
+        *)
+            usage
+            exit 255
+        ;;
+    esac
+done
+shift $((OPTIND-1))
+
+if [[ -z $OPT ]]; then
+    usage
+    exit 255
+fi
+
+
